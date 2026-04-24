@@ -1,0 +1,608 @@
+{% extends "base.html" %}
+{% block title %}Учет кормов{% endblock %}
+{% block content %}
+
+<!-- Статистика -->
+<div class="stats-grid">
+    <div class="card stat-card">
+        <div class="stat-value">{{ total_feeds }}</div>
+        <div class="stat-label"><i class="fas fa-box"></i> Видов кормов</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-value">{{ "%.0f"|format(total_value) }} ₽</div>
+        <div class="stat-label"><i class="fas fa-ruble-sign"></i> Общая стоимость</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-value">{{ low_count }}</div>
+        <div class="stat-label"><i class="fas fa-exclamation-triangle" style="color: #ef4444;"></i> Требуют закупки</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-value">{{ recent_transactions|length }}</div>
+        <div class="stat-label"><i class="fas fa-exchange-alt"></i> Операций сегодня</div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <!-- Добавление корма -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-plus-circle" style="color: #22c55e;"></i> Добавить новый корм</h3>
+        </div>
+        <form method="POST" action="{{ url_for('add_feed') }}" onsubmit="return validateAddFeed()">
+            <div class="form-group">
+                <label><i class="fas fa-tag"></i> Название *</label>
+                <input type="text" name="name" id="feedName" placeholder="Например: Сено луговое" required>
+            </div>
+            
+            <div class="grid-2">
+                <div class="form-group">
+                    <label><i class="fas fa-weight-scale"></i> Ед. измерения</label>
+                    <select name="unit">
+                        <option value="кг">кг</option>
+                        <option value="г">г</option>
+                        <option value="т">тонна</option>
+                        <option value="центнер">центнер</option>
+                        <option value="литр">литр</option>
+                        <option value="мешок">мешок (25 кг)</option>
+                        <option value="рулон">рулон (~300 кг)</option>
+                        <option value="тюк">тюк (~20 кг)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-ruble-sign"></i> Цена за ед.</label>
+                    <input type="number" step="0.01" min="0" name="price" id="feedPrice" placeholder="0.00" value="0">
+                </div>
+            </div>
+            
+            <div class="grid-2">
+                <div class="form-group">
+                    <label><i class="fas fa-arrow-down"></i> Мин. запас</label>
+                    <input type="number" step="0.01" min="0" name="min_threshold" id="feedThreshold" placeholder="100" value="0">
+                    <small>При каком остатке предупреждать</small>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-box"></i> Начальный остаток</label>
+                    <input type="number" step="0.01" min="0" name="initial_stock" id="feedStock" placeholder="0" value="0">
+                    <small>Можно оставить 0</small>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Добавить корм
+            </button>
+        </form>
+    </div>
+    
+    <!-- Операция с кормом -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-exchange-alt" style="color: #3b82f6;"></i> Приход / Расход</h3>
+        </div>
+        <form method="POST" action="{{ url_for('feed_transaction') }}" onsubmit="return validateTransaction()">
+            <div class="form-group">
+                <label><i class="fas fa-box"></i> Выберите корм *</label>
+                <select name="feed_id" id="transFeedSelect" required onchange="updateQuantityHint()">
+                    <option value="">-- Выберите корм --</option>
+                    {% for f in feeds %}
+                    <option value="{{ f.id }}" data-stock="{{ f.current_stock }}" data-unit="{{ f.unit }}">
+                        {{ f.name }} ({{ f.current_stock }} {{ f.unit }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label><i class="fas fa-arrow-right"></i> Тип операции *</label>
+                <select name="type" id="transType" required onchange="updateButtonColor(); updateQuantityHint()">
+                    <option value="in">📥 Приход (+)</option>
+                    <option value="out">📤 Расход (-)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label><i class="fas fa-sort-amount-up"></i> Количество *</label>
+                <input type="number" step="0.01" min="0.01" name="quantity" id="transQuantity" placeholder="0" required>
+                <small id="quantityHint" style="color: #6b7280;"></small>
+            </div>
+            
+            <div class="form-group">
+                <label><i class="fas fa-pen"></i> Примечание</label>
+                <input type="text" name="notes" placeholder="Например: Закупка у поставщика">
+            </div>
+            
+            <button type="submit" id="transSubmitBtn" class="btn btn-success">
+                <i class="fas fa-check"></i> Выполнить
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- График движения кормов -->
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-chart-bar"></i> Движение кормов за последние 7 дней</h3>
+    </div>
+    <div class="chart-wrapper">
+        <div class="chart-container">
+            {% for day in last_7_days %}
+            <div class="chart-day">
+                <div class="chart-bars">
+                    {% if day.in > 0 %}
+                    {% set height_in = (day.in / 100) * 150 %}
+                    {% if height_in > 150 %}{% set height_in = 150 %}{% endif %}
+                    <div class="chart-bar chart-bar-in" data-height="{{ height_in|int }}" title="Приход: {{ day.in }}"></div>
+                    {% endif %}
+                    {% if day.out > 0 %}
+                    {% set height_out = (day.out / 100) * 150 %}
+                    {% if height_out > 150 %}{% set height_out = 150 %}{% endif %}
+                    <div class="chart-bar chart-bar-out" data-height="{{ height_out|int }}" title="Расход: {{ day.out }}"></div>
+                    {% endif %}
+                    {% if day.in == 0 and day.out == 0 %}
+                    <div class="chart-bar chart-bar-empty"></div>
+                    {% endif %}
+                </div>
+                <div class="chart-date">{{ day.date }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="chart-legend">
+            <span><span class="legend-color legend-in"></span> Приход</span>
+            <span><span class="legend-color legend-out"></span> Расход</span>
+        </div>
+    </div>
+</div>
+
+<!-- Складские запасы -->
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-warehouse"></i> Складские запасы</h3>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Корм</th>
+                    <th>Ед.</th>
+                    <th>Остаток</th>
+                    <th>Мин. порог</th>
+                    <th>Цена/ед.</th>
+                    <th>Стоимость</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in feeds %}
+                <tr data-feed-id="{{ f.id }}" data-feed-name="{{ f.name }}" data-feed-unit="{{ f.unit }}" data-feed-threshold="{{ f.min_threshold }}" data-feed-price="{{ f.price_per_unit }}" data-feed-stock="{{ f.current_stock }}">
+                    <td><strong>{{ f.name }}</strong></td>
+                    <td>{{ f.unit }}</td>
+                    <td><span class="stock-value">{{ f.current_stock }}</span> {{ f.unit }}</td>
+                    <td>{{ f.min_threshold }} {{ f.unit }}</td>
+                    <td>{{ "%.2f"|format(f.price_per_unit) }} ₽</td>
+                    <td>{{ "%.2f"|format(f.total_value) }} ₽</td>
+                    <td>
+                        {% if f.current_stock <= 0 %}
+                            <span class="status-badge status-critical"><i class="fas fa-skull"></i> Закончился!</span>
+                        {% elif f.current_stock <= f.min_threshold %}
+                            <span class="status-badge status-low"><i class="fas fa-exclamation-triangle"></i> Мало!</span>
+                            {% if f.needed_to_buy > 0 %}
+                            <br><small>Докупить: {{ "%.1f"|format(f.needed_to_buy) }} {{ f.unit }}</small>
+                            {% endif %}
+                        {% else %}
+                            <span class="status-badge status-normal"><i class="fas fa-check-circle"></i> Норма</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 5px;">
+                            <button type="button" class="btn btn-sm edit-feed-btn" title="Редактировать">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <a href="{{ url_for('feed_transactions', id=f.id) }}" class="btn btn-sm" title="История операций">
+                                <i class="fas fa-history"></i>
+                            </a>
+                            <a href="{{ url_for('delete_feed', id=f.id) }}" class="btn btn-sm btn-danger confirm-delete" title="Удалить">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 40px;">
+                        <i class="fas fa-box-open" style="font-size: 48px; color: #cbd5e1; margin-bottom: 15px;"></i>
+                        <p style="color: #6b7280;">Нет кормов. Добавьте первый!</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Последние операции -->
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-history"></i> Последние операции</h3>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Корм</th>
+                    <th>Тип</th>
+                    <th>Количество</th>
+                    <th>Примечание</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in recent_transactions %}
+                <tr>
+                    <td>{{ t.date.strftime('%d.%m.%Y %H:%M') }}</td>
+                    <td>{{ t.feed.name }}</td>
+                    <td>
+                        {% if t.type == 'in' %}
+                            <span class="status-badge status-normal"><i class="fas fa-arrow-down"></i> Приход</span>
+                        {% else %}
+                            <span class="status-badge status-low"><i class="fas fa-arrow-up"></i> Расход</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ t.quantity }} {{ t.feed.unit }}</td>
+                    <td>{{ t.notes or '-' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center;">Нет операций</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Модальное окно редактирования корма -->
+<div id="editFeedModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-edit"></i> Редактировать корм</h3>
+            <span class="close" onclick="closeEditModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="editFeedForm" method="POST">
+                <input type="hidden" name="feed_id" id="editFeedId">
+                <input type="hidden" id="editFeedOldUnit">
+                
+                <div class="form-group">
+                    <label><i class="fas fa-tag"></i> Название</label>
+                    <input type="text" name="name" id="editFeedName" required>
+                </div>
+                
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label><i class="fas fa-weight-scale"></i> Ед. измерения</label>
+                        <select name="unit" id="editFeedUnit">
+                            <option value="кг">кг</option>
+                            <option value="г">г</option>
+                            <option value="т">тонна</option>
+                            <option value="центнер">центнер</option>
+                            <option value="литр">литр</option>
+                            <option value="мешок">мешок (25 кг)</option>
+                            <option value="рулон">рулон (~300 кг)</option>
+                            <option value="тюк">тюк (~20 кг)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-ruble-sign"></i> Цена за ед.</label>
+                        <input type="number" step="0.01" min="0" name="price" id="editFeedPrice" required>
+                        <small id="priceHint" style="color: #6b7280;"></small>
+                    </div>
+                </div>
+                
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label><i class="fas fa-arrow-down"></i> Мин. запас</label>
+                        <input type="number" step="0.01" min="0" name="min_threshold" id="editFeedThreshold">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-box"></i> Текущий остаток</label>
+                        <input type="number" step="0.01" name="current_stock" id="editFeedStock" readonly style="background: #f3f4f6;">
+                        <small>Остаток изменится автоматически</small>
+                    </div>
+                </div>
+                
+                <div id="conversionInfo" style="background: #f0fdf4; padding: 10px; border-radius: 8px; margin: 15px 0; display: none;">
+                    <i class="fas fa-info-circle" style="color: #22c55e;"></i>
+                    <span id="conversionText"></span>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">
+                        <i class="fas fa-save"></i> Сохранить
+                    </button>
+                    <button type="button" class="btn" onclick="closeEditModal()" style="flex: 1;">
+                        Отмена
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+    
+    // Установка высоты столбцов графика
+    document.addEventListener('DOMContentLoaded', function() {
+        var bars = document.querySelectorAll('.chart-bar[data-height]');
+        bars.forEach(function(bar) {
+            var height = bar.getAttribute('data-height');
+            bar.style.height = height + 'px';
+        });
+    });
+    
+    const UNIT_TO_KG = {
+        'кг': 1,
+        'г': 0.001,
+        'т': 1000,
+        'тонна': 1000,
+        'центнер': 100,
+        'ц': 100,
+        'литр': 1,
+        'л': 1,
+        'мешок': 25,
+        'рулон': 300,
+        'тюк': 20
+    };
+
+    let originalUnit = '';
+    let originalPrice = 0;
+    let originalStock = 0;
+    let originalThreshold = 0;
+    let basePricePerKg = 0;
+
+    // Обновление цвета кнопки операции
+    window.updateButtonColor = function() {
+        const typeSelect = document.getElementById('transType');
+        const btn = document.getElementById('transSubmitBtn');
+        if (!typeSelect || !btn) return;
+        
+        if (typeSelect.value === 'in') {
+            btn.className = 'btn btn-success';
+            btn.innerHTML = '<i class="fas fa-arrow-down"></i> Оформить приход';
+        } else {
+            btn.className = 'btn btn-warning';
+            btn.innerHTML = '<i class="fas fa-arrow-up"></i> Оформить расход';
+        }
+    };
+
+    // Обновление подсказки по количеству
+    window.updateQuantityHint = function() {
+        const typeSelect = document.getElementById('transType');
+        const quantityInput = document.getElementById('transQuantity');
+        const hint = document.getElementById('quantityHint');
+        const feedSelect = document.getElementById('transFeedSelect');
+        
+        if (!typeSelect || !quantityInput || !hint || !feedSelect) return;
+        
+        if (typeSelect.value === 'out') {
+            const selectedOption = feedSelect.options[feedSelect.selectedIndex];
+            if (selectedOption && selectedOption.dataset.stock) {
+                const stock = parseFloat(selectedOption.dataset.stock);
+                const unit = selectedOption.dataset.unit;
+                quantityInput.max = stock;
+                hint.innerHTML = '<i class="fas fa-info-circle"></i> Максимум: ' + stock + ' ' + unit;
+            } else {
+                quantityInput.removeAttribute('max');
+                hint.textContent = 'Сначала выберите корм';
+            }
+        } else {
+            quantityInput.removeAttribute('max');
+            hint.innerHTML = '<i class="fas fa-info-circle"></i> Введите количество для прихода';
+        }
+    };
+
+    // Валидация операции
+    window.validateTransaction = function() {
+        const quantity = parseFloat(document.getElementById('transQuantity').value);
+        const type = document.getElementById('transType').value;
+        const feedSelect = document.getElementById('transFeedSelect');
+        const selectedOption = feedSelect.options[feedSelect.selectedIndex];
+        
+        if (!selectedOption || !selectedOption.value) {
+            alert('Выберите корм!');
+            return false;
+        }
+        
+        if (isNaN(quantity) || quantity <= 0) {
+            alert('Количество должно быть больше нуля!');
+            return false;
+        }
+        
+        if (type === 'out') {
+            const stock = parseFloat(selectedOption.dataset.stock);
+            const unit = selectedOption.dataset.unit;
+            
+            if (quantity > stock) {
+                alert('Недостаточно корма! В наличии: ' + stock + ' ' + unit);
+                return false;
+            }
+        }
+        
+        return true;
+    };
+
+    // Валидация добавления корма
+    window.validateAddFeed = function() {
+        const name = document.getElementById('feedName').value.trim();
+        const price = parseFloat(document.getElementById('feedPrice').value);
+        const stock = parseFloat(document.getElementById('feedStock').value);
+        
+        if (!name) {
+            alert('Введите название корма!');
+            return false;
+        }
+        
+        if (isNaN(price) || price < 0) {
+            alert('Цена не может быть отрицательной!');
+            return false;
+        }
+        
+        if (isNaN(stock) || stock < 0) {
+            alert('Начальный остаток не может быть отрицательным!');
+            return false;
+        }
+        
+        return true;
+    };
+
+    function convertToKg(amount, unit) {
+        if (UNIT_TO_KG[unit]) {
+            return amount * UNIT_TO_KG[unit];
+        }
+        return amount;
+    }
+
+    function convertFromKg(kgAmount, unit) {
+        if (UNIT_TO_KG[unit] && UNIT_TO_KG[unit] > 0) {
+            return kgAmount / UNIT_TO_KG[unit];
+        }
+        return kgAmount;
+    }
+
+    window.editFeed = function(id, name, unit, threshold, price, stock) {
+        originalUnit = unit;
+        originalPrice = parseFloat(price);
+        originalStock = parseFloat(stock);
+        originalThreshold = parseFloat(threshold);
+        
+        if (UNIT_TO_KG[unit] && UNIT_TO_KG[unit] > 0) {
+            basePricePerKg = originalPrice / UNIT_TO_KG[unit];
+        }
+        
+        document.getElementById('editFeedId').value = id;
+        document.getElementById('editFeedName').value = name;
+        document.getElementById('editFeedUnit').value = unit;
+        document.getElementById('editFeedThreshold').value = threshold;
+        document.getElementById('editFeedPrice').value = price;
+        document.getElementById('editFeedStock').value = stock;
+        document.getElementById('editFeedOldUnit').value = unit;
+        document.getElementById('editFeedForm').action = '/feed/' + id + '/edit';
+        
+        document.getElementById('conversionInfo').style.display = 'none';
+        document.getElementById('priceHint').textContent = '';
+        document.getElementById('editFeedModal').style.display = 'flex';
+    };
+
+    window.calculateNewPrice = function() {
+        const newUnit = document.getElementById('editFeedUnit').value;
+        const oldUnit = originalUnit;
+        const priceInput = document.getElementById('editFeedPrice');
+        const stockInput = document.getElementById('editFeedStock');
+        const thresholdInput = document.getElementById('editFeedThreshold');
+        const conversionInfo = document.getElementById('conversionInfo');
+        const conversionText = document.getElementById('conversionText');
+        const priceHint = document.getElementById('priceHint');
+        
+        if (oldUnit === newUnit) {
+            priceInput.value = originalPrice;
+            stockInput.value = originalStock;
+            thresholdInput.value = originalThreshold;
+            conversionInfo.style.display = 'none';
+            priceHint.textContent = '';
+            return;
+        }
+        
+        if (UNIT_TO_KG[oldUnit] && UNIT_TO_KG[newUnit]) {
+            const newPrice = basePricePerKg * UNIT_TO_KG[newUnit];
+            priceInput.value = newPrice.toFixed(2);
+            
+            const kgAmount = convertToKg(originalStock, oldUnit);
+            const newStock = convertFromKg(kgAmount, newUnit);
+            stockInput.value = newStock.toFixed(3);
+            
+            const kgThreshold = convertToKg(originalThreshold, oldUnit);
+            const newThreshold = convertFromKg(kgThreshold, newUnit);
+            thresholdInput.value = newThreshold.toFixed(3);
+            
+            conversionInfo.style.display = 'block';
+            conversionText.innerHTML = ' <strong>Конвертация:</strong><br> • 1 ' + oldUnit + ' = ' + UNIT_TO_KG[oldUnit] + ' кг<br> • 1 ' + newUnit + ' = ' + UNIT_TO_KG[newUnit] + ' кг<br> • ' + originalStock + ' ' + oldUnit + ' = ' + newStock.toFixed(2) + ' ' + newUnit;
+            
+            priceHint.textContent = 'Базовая цена: ' + basePricePerKg.toFixed(2) + ' ₽/кг';
+        }
+    };
+
+    window.closeEditModal = function() {
+        document.getElementById('editFeedModal').style.display = 'none';
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const typeSelect = document.getElementById('transType');
+        if (typeSelect) {
+            typeSelect.addEventListener('change', function() {
+                window.updateButtonColor();
+                window.updateQuantityHint();
+            });
+            window.updateButtonColor();
+            window.updateQuantityHint();
+        }
+        
+        const feedSelect = document.getElementById('transFeedSelect');
+        if (feedSelect) {
+            feedSelect.addEventListener('change', window.updateQuantityHint);
+        }
+        
+        const editButtons = document.querySelectorAll('.edit-feed-btn');
+        editButtons.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const row = this.closest('tr');
+                const id = row.getAttribute('data-feed-id');
+                const name = row.getAttribute('data-feed-name');
+                const unit = row.getAttribute('data-feed-unit');
+                const threshold = row.getAttribute('data-feed-threshold');
+                const price = row.getAttribute('data-feed-price');
+                const stock = row.getAttribute('data-feed-stock');
+                
+                window.editFeed(id, name, unit, threshold, price, stock);
+            });
+        });
+        
+        const unitSelect = document.getElementById('editFeedUnit');
+        if (unitSelect) {
+            unitSelect.addEventListener('change', window.calculateNewPrice);
+        }
+    });
+
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            window.closeEditModal();
+        }
+    });
+
+    window.onclick = function(event) {
+        const modal = document.getElementById('editFeedModal');
+        if (event.target === modal) {
+            window.closeEditModal();
+        }
+    };
+})();
+</script>
+
+<style>
+.chart-wrapper { padding: 20px; }
+.chart-container { display: flex; gap: 30px; justify-content: center; align-items: flex-end; min-height: 200px; }
+.chart-day { text-align: center; }
+.chart-bars { display: flex; gap: 5px; align-items: flex-end; }
+.chart-bar { width: 30px; min-height: 5px; border-radius: 6px 6px 0 0; }
+.chart-bar-in { background: linear-gradient(135deg, #22c55e, #16a34a); }
+.chart-bar-out { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.chart-bar-empty { height: 5px; background: #cbd5e1; }
+.chart-date { margin-top: 8px; font-size: 0.8rem; color: #6b7280; }
+.chart-legend { display: flex; gap: 20px; justify-content: center; margin-top: 15px; }
+.legend-color { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; }
+.legend-in { background: #22c55e; }
+.legend-out { background: #ef4444; }
+.stock-value { font-weight: 600; font-size: 1.1rem; }
+</style>
+
+{% endblock %}
