@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% block title %}Животные{% endblock %}
+{% block content %}
+
+<div class="card">
+    <div class="card-header">
+        <h2><i class="fas fa-paw"></i> Поголовье фермы</h2>
+        <a href="{{ url_for('add_animal') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Добавить животное
+        </a>
+    </div>
+    
+    <!-- Статистика по видам -->
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;">
+        <span class="status-badge status-planned">
+            <i class="fas fa-paw"></i> Всего: {{ total_count }}
+        </span>
+        {% for species, count in species_counts.items() %}
+        <span class="status-badge status-active">
+            {% if species == 'Корова' %}🐄
+            {% elif species == 'Свинья' %}🐖
+            {% elif species == 'Коза' %}🐐
+            {% elif species == 'Овца' %}🐑
+            {% elif species == 'Лошадь' %}🐎
+            {% elif species == 'Курица' %}🐔
+            {% elif species == 'Утка' %}🦆
+            {% elif species == 'Гусь' %}🦢
+            {% elif species == 'Кролик' %}🐇
+            {% elif species == 'Пчелосемья' %}🐝
+            {% else %}🐾{% endif %}
+            {{ species }}: {{ count }}
+        </span>
+        {% endfor %}
+    </div>
+    
+    <!-- Фильтры -->
+    <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+        <div>
+            <label style="font-size: 0.85rem; color: #6b7280;">Вид:</label>
+            <select id="speciesFilter" style="width: auto; padding: 8px 16px;">
+                <option value="all" {% if species_filter == 'all' %}selected{% endif %}>Все виды</option>
+                <option value="Корова" {% if species_filter == 'Корова' %}selected{% endif %}>🐄 Коровы</option>
+                <option value="Свинья" {% if species_filter == 'Свинья' %}selected{% endif %}>🐖 Свиньи</option>
+                <option value="Коза" {% if species_filter == 'Коза' %}selected{% endif %}>🐐 Козы</option>
+                <option value="Овца" {% if species_filter == 'Овца' %}selected{% endif %}>🐑 Овцы</option>
+                <option value="Лошадь" {% if species_filter == 'Лошадь' %}selected{% endif %}>🐎 Лошади</option>
+                <option value="Курица" {% if species_filter == 'Курица' %}selected{% endif %}>🐔 Куры</option>
+                <option value="Утка" {% if species_filter == 'Утка' %}selected{% endif %}>🦆 Утки</option>
+                <option value="Гусь" {% if species_filter == 'Гусь' %}selected{% endif %}>🦢 Гуси</option>
+                <option value="Кролик" {% if species_filter == 'Кролик' %}selected{% endif %}>🐇 Кролики</option>
+                <option value="Пчелосемья" {% if species_filter == 'Пчелосемья' %}selected{% endif %}>🐝 Пчёлы</option>
+            </select>
+        </div>
+        <div>
+            <label style="font-size: 0.85rem; color: #6b7280;">Статус:</label>
+            <select id="statusFilter" style="width: auto; padding: 8px 16px;">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Все статусы</option>
+                <option value="Активно" {% if status_filter == 'Активно' %}selected{% endif %}>Активно</option>
+                <option value="Дойная" {% if status_filter == 'Дойная' %}selected{% endif %}>Дойная</option>
+                <option value="Сухостой" {% if status_filter == 'Сухостой' %}selected{% endif %}>Сухостой</option>
+                <option value="На откорме" {% if status_filter == 'На откорме' %}selected{% endif %}>На откорме</option>
+                <option value="На лечении" {% if status_filter == 'На лечении' %}selected{% endif %}>На лечении</option>
+                <option value="Продано" {% if status_filter == 'Продано' %}selected{% endif %}>Продано</option>
+                <option value="Пало" {% if status_filter == 'Пало' %}selected{% endif %}>Пало</option>
+            </select>
+        </div>
+        {% if species_filter != 'all' or status_filter != 'all' %}
+        <a href="{{ url_for('animals') }}" class="btn btn-sm" style="align-self: flex-end;">
+            <i class="fas fa-times"></i> Сбросить
+        </a>
+        {% endif %}
+    </div>
+    
+    <!-- Таблица животных -->
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID/Кличка</th>
+                    <th>Вид</th>
+                    <th>Порода</th>
+                    <th>Пол</th>
+                    <th>Возраст</th>
+                    <th>Вес (кг)</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in animals %}
+                <tr data-animal-id="{{ a.id }}" data-animal-name="{{ a.identifier }}" data-animal-weight="{{ a.weight or 0 }}">
+                    <td>
+                        <strong>{{ a.identifier }}</strong>
+                        {% if a.notes %}
+                        <br><small style="color: #6b7280;">{{ a.notes[:30] }}...</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if a.species == 'Корова' %}🐄
+                        {% elif a.species == 'Свинья' %}🐖
+                        {% elif a.species == 'Коза' %}🐐
+                        {% elif a.species == 'Овца' %}🐑
+                        {% elif a.species == 'Лошадь' %}🐎
+                        {% elif a.species == 'Курица' %}🐔
+                        {% elif a.species == 'Утка' %}🦆
+                        {% elif a.species == 'Гусь' %}🦢
+                        {% elif a.species == 'Кролик' %}🐇
+                        {% elif a.species == 'Пчелосемья' %}🐝
+                        {% else %}🐾{% endif %}
+                        {{ a.species }}
+                    </td>
+                    <td>{{ a.breed or '-' }}</td>
+                    <td>
+                        {% if a.gender == 'Самка' %}♀️
+                        {% elif a.gender == 'Самец' %}♂️
+                        {% else %}-{% endif %}
+                        {{ a.gender or '-' }}
+                    </td>
+                    <td>{{ a.age }}</td>
+                    <td>
+                        {% if a.weight %}
+                            {{ a.weight }} кг
+                            <button type="button" class="btn btn-sm weight-btn" style="padding: 2px 6px; margin-left: 5px;" title="Обновить вес">
+                                <i class="fas fa-weight-scale"></i>
+                            </button>
+                        {% else %}
+                            <button type="button" class="btn btn-sm weight-btn" style="padding: 4px 8px;" title="Добавить вес">
+                                <i class="fas fa-plus"></i> Указать
+                            </button>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if a.status == 'Дойная' %}
+                            <span class="status-badge status-milking"><i class="fas fa-tint"></i> {{ a.status }}</span>
+                        {% elif a.status == 'Сухостой' %}
+                            <span class="status-badge status-dry"><i class="fas fa-moon"></i> {{ a.status }}</span>
+                        {% elif a.status == 'На откорме' %}
+                            <span class="status-badge status-fattening"><i class="fas fa-weight-scale"></i> {{ a.status }}</span>
+                        {% elif a.status == 'На лечении' %}
+                            <span class="status-badge status-overdue"><i class="fas fa-hospital"></i> {{ a.status }}</span>
+                        {% elif a.status == 'Продано' %}
+                            <span class="status-badge status-completed"><i class="fas fa-truck"></i> {{ a.status }}</span>
+                        {% elif a.status == 'Пало' %}
+                            <span class="status-badge" style="background: #e5e7eb; color: #374151;"><i class="fas fa-skull"></i> {{ a.status }}</span>
+                        {% else %}
+                            <span class="status-badge status-active"><i class="fas fa-check"></i> {{ a.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 5px;">
+                            <a href="{{ url_for('edit_animal', id=a.id) }}" class="btn btn-sm" title="Редактировать">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="{{ url_for('delete_animal', id=a.id) }}" class="btn btn-sm btn-danger confirm-delete" title="Удалить">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 40px;">
+                        <i class="fas fa-paw" style="font-size: 48px; color: #cbd5e1; margin-bottom: 15px;"></i>
+                        <p style="color: #6b7280;">Нет животных. Добавьте первое!</p>
+                        <a href="{{ url_for('add_animal') }}" class="btn btn-primary" style="margin-top: 15px;">
+                            <i class="fas fa-plus"></i> Добавить животное
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Модальное окно для обновления веса -->
+<div id="weightModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-weight-scale"></i> Обновить вес</h3>
+            <span class="close" onclick="closeWeightModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p>Животное: <strong id="weightAnimalName"></strong></p>
+            <p>Текущий вес: <strong id="currentWeight"></strong> кг</p>
+            
+            <form id="weightForm" method="POST">
+                <div class="form-group">
+                    <label>Новый вес (кг) *</label>
+                    <input type="number" step="0.1" name="weight" id="newWeight" required class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Дата измерения</label>
+                    <input type="date" name="date" id="measureDate" class="form-control">
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">
+                        <i class="fas fa-save"></i> Сохранить
+                    </button>
+                    <button type="button" class="btn" onclick="closeWeightModal()" style="flex: 1;">
+                        Отмена
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Установка сегодняшней даты для поля даты
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const dateInput = document.getElementById('measureDate');
+    if (dateInput) {
+        dateInput.value = `${year}-${month}-${day}`;
+    }
+    
+    // Навешиваем обработчики на кнопки веса
+    document.querySelectorAll('.weight-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const row = this.closest('tr');
+            const animalId = row.getAttribute('data-animal-id');
+            const animalName = row.getAttribute('data-animal-name');
+            const currentWeight = row.getAttribute('data-animal-weight');
+            
+            showWeightModal(animalId, animalName, currentWeight);
+        });
+    });
+    
+    // Обработчики для фильтров
+    const speciesFilter = document.getElementById('speciesFilter');
+    const statusFilter = document.getElementById('statusFilter');
+    
+    if (speciesFilter) {
+        speciesFilter.addEventListener('change', function() {
+            const species = this.value;
+            const status = statusFilter ? statusFilter.value : 'all';
+            window.location.href = '?species=' + species + '&status=' + status;
+        });
+    }
+    
+    if (statusFilter) {
+        statusFilter.addEventListener('change', function() {
+            const status = this.value;
+            const species = speciesFilter ? speciesFilter.value : 'all';
+            window.location.href = '?species=' + species + '&status=' + status;
+        });
+    }
+});
+
+function showWeightModal(id, name, currentWeight) {
+    document.getElementById('weightAnimalName').textContent = name;
+    document.getElementById('currentWeight').textContent = currentWeight || 'не указан';
+    document.getElementById('newWeight').value = currentWeight || '';
+    document.getElementById('weightForm').action = '/animal/' + id + '/weight/add';
+    document.getElementById('weightModal').style.display = 'flex';
+}
+
+function closeWeightModal() {
+    document.getElementById('weightModal').style.display = 'none';
+}
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeWeightModal();
+    }
+});
+
+window.onclick = function(event) {
+    const modal = document.getElementById('weightModal');
+    if (event.target === modal) {
+        closeWeightModal();
+    }
+}
+</script>
+
+{% endblock %}

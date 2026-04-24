@@ -1,0 +1,527 @@
+{% extends "base.html" %}
+{% block title %}Ветеринария{% endblock %}
+{% block content %}
+
+<!-- Статистика -->
+<div class="stats-grid">
+    <div class="card stat-card">
+        <div class="stat-value">{{ upcoming|length }}</div>
+        <div class="stat-label"><i class="fas fa-calendar-alt"></i> Всего предстоит</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-value">{{ urgent|length }}</div>
+        <div class="stat-label"><i class="fas fa-clock" style="color: #f59e0b;"></i> Срочных (≤14 дней)</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-value">{{ overdue|length }}</div>
+        <div class="stat-label"><i class="fas fa-exclamation-circle" style="color: #ef4444;"></i> Просрочено</div>
+    </div>
+    <div class="card stat-card">
+        <div class="stat-value">{{ completed|length }}</div>
+        <div class="stat-label"><i class="fas fa-check-circle" style="color: #22c55e;"></i> Выполнено</div>
+    </div>
+</div>
+
+<!-- ПРОСРОЧЕННЫЕ ОБРАБОТКИ -->
+{% if overdue %}
+<div class="card" style="border-left: 6px solid #ef4444;">
+    <div class="card-header">
+        <h3 style="color: #991b1b;"><i class="fas fa-exclamation-triangle"></i> ПРОСРОЧЕННЫЕ ОБРАБОТКИ!</h3>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Животное</th>
+                    <th>Вакцина/Обработка</th>
+                    <th>Должна была быть</th>
+                    <th>Просрочка</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in overdue %}
+                <tr style="background-color: #fef2f2;" data-vac-id="{{ v.id }}" data-vac-name="{{ v.vaccine_name }}" data-animal-name="{{ v.animal.identifier }}" data-due-date="{{ v.next_due_date.strftime('%d.%m.%Y') if v.next_due_date else '' }}">
+                    <td><strong>{{ v.animal.identifier }}</strong> ({{ v.animal.species }})</td>
+                    <td>{{ v.vaccine_name }}</td>
+                    <td>{{ v.next_due_date.strftime('%d.%m.%Y') }}</td>
+                    <td>
+                        {% set days_overdue = (today - v.next_due_date).days %}
+                        <span class="status-badge status-overdue"><i class="fas fa-clock"></i> {{ days_overdue }} дн. назад</span>
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 5px;">
+                            <button type="button" class="btn btn-sm btn-success complete-btn" title="Отметить выполненной">
+                                <i class="fas fa-check"></i> Выполнено
+                            </button>
+                            <a href="{{ url_for('edit_vaccination', id=v.id) }}" class="btn btn-sm" title="Редактировать">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="{{ url_for('delete_vaccination', id=v.id) }}" class="btn btn-sm btn-danger confirm-delete" title="Удалить">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- СРОЧНЫЕ ОБРАБОТКИ (14 дней) -->
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-clock" style="color: #f59e0b;"></i> Предстоящие обработки (ближайшие 14 дней)</h3>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Животное</th>
+                    <th>Вакцина/Обработка</th>
+                    <th>Плановая дата</th>
+                    <th>Осталось</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in urgent %}
+                <tr data-vac-id="{{ v.id }}" data-vac-name="{{ v.vaccine_name }}" data-animal-name="{{ v.animal.identifier }}" data-due-date="{{ v.next_due_date.strftime('%d.%m.%Y') if v.next_due_date else '' }}">
+                    <td><strong>{{ v.animal.identifier }}</strong> ({{ v.animal.species }})</td>
+                    <td>{{ v.vaccine_name }}</td>
+                    <td>{{ v.next_due_date.strftime('%d.%m.%Y') }}</td>
+                    <td>
+                        {% set days_left = (v.next_due_date - today).days %}
+                        {% if days_left == 0 %}
+                            <span class="status-badge status-today"><i class="fas fa-exclamation"></i> СЕГОДНЯ!</span>
+                        {% elif days_left == 1 %}
+                            <span class="status-badge status-urgent"><i class="fas fa-clock"></i> Завтра</span>
+                        {% elif days_left <= 3 %}
+                            <span class="status-badge status-urgent"><i class="fas fa-clock"></i> {{ days_left }} дня</span>
+                        {% elif days_left <= 7 %}
+                            <span class="status-badge status-planned"><i class="fas fa-calendar"></i> {{ days_left }} дней</span>
+                        {% else %}
+                            <span class="status-badge status-planned"><i class="fas fa-calendar"></i> {{ days_left }} дней</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 5px;">
+                            <button type="button" class="btn btn-sm btn-success complete-btn" title="Отметить выполненной">
+                                <i class="fas fa-check"></i> Выполнено
+                            </button>
+                            <a href="{{ url_for('edit_vaccination', id=v.id) }}" class="btn btn-sm" title="Редактировать">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="{{ url_for('delete_vaccination', id=v.id) }}" class="btn btn-sm btn-danger confirm-delete" title="Удалить">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 30px;">
+                        <i class="fas fa-check-circle" style="color: #22c55e; font-size: 2rem;"></i>
+                        <p>Нет срочных обработок на ближайшие 14 дней!</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ВСЕ ПРЕДСТОЯЩИЕ ОБРАБОТКИ -->
+<div class="card">
+    <div class="card-header">
+        <h3><i class="fas fa-calendar"></i> Все запланированные обработки</h3>
+    </div>
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Животное</th>
+                    <th>Вакцина/Обработка</th>
+                    <th>Плановая дата</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in upcoming %}
+                <tr data-vac-id="{{ v.id }}" data-vac-name="{{ v.vaccine_name }}" data-animal-name="{{ v.animal.identifier }}" data-due-date="{{ v.next_due_date.strftime('%d.%m.%Y') if v.next_due_date else '' }}">
+                    <td><strong>{{ v.animal.identifier }}</strong> ({{ v.animal.species }})</td>
+                    <td>{{ v.vaccine_name }}</td>
+                    <td>{{ v.next_due_date.strftime('%d.%m.%Y') if v.next_due_date else '-' }}</td>
+                    <td>
+                        {% if v.next_due_date %}
+                            {% set days_left = (v.next_due_date - today).days %}
+                            {% if days_left < 0 %}
+                                <span class="status-badge status-overdue"><i class="fas fa-exclamation-triangle"></i> Просрочено</span>
+                            {% elif days_left == 0 %}
+                                <span class="status-badge status-today"><i class="fas fa-exclamation"></i> Сегодня</span>
+                            {% elif days_left <= 3 %}
+                                <span class="status-badge status-urgent"><i class="fas fa-clock"></i> Срочно</span>
+                            {% elif days_left <= 14 %}
+                                <span class="status-badge status-planned"><i class="fas fa-calendar-check"></i> Запланировано</span>
+                            {% else %}
+                                <span class="status-badge status-planned"><i class="fas fa-calendar"></i> В плане</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="status-badge status-planned"><i class="fas fa-calendar"></i> Запланировано</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 5px;">
+                            <button type="button" class="btn btn-sm btn-success complete-btn" title="Отметить выполненной">
+                                <i class="fas fa-check"></i> Выполнено
+                            </button>
+                            <a href="{{ url_for('edit_vaccination', id=v.id) }}" class="btn btn-sm" title="Редактировать">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="{{ url_for('delete_vaccination', id=v.id) }}" class="btn btn-sm btn-danger confirm-delete" title="Удалить">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 20px;">
+                        <p>Нет запланированных обработок</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Форма добавления и история -->
+<div class="grid-2">
+    <!-- Форма добавления -->
+    <div class="card">
+        <h3><i class="fas fa-plus-circle"></i> Новая запись о прививке/обработке</h3>
+        <form method="POST" action="{{ url_for('add_vaccination') }}">
+            <div class="form-group">
+                <label>Животное *</label>
+                <select name="animal_id" required>
+                    <option value="">Выберите животное</option>
+                    {% for a in animals %}
+                    <option value="{{ a.id }}">{{ a.identifier }} ({{ a.species }}) - {{ a.status }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Название вакцины/обработки *</label>
+                <input type="text" name="vaccine_name" placeholder="Например: Сибирская язва, Глистогонка..." required>
+            </div>
+            
+            <div class="form-group">
+                <label>Дата плановой обработки *</label>
+                <input type="date" name="next_due_date" required value="{{ today.strftime('%Y-%m-%d') }}">
+                <small>Когда нужно сделать прививку</small>
+            </div>
+            
+            <div class="form-group">
+                <label>Заметки</label>
+                <textarea name="notes" rows="2" placeholder="Дополнительная информация..."></textarea>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Записать
+            </button>
+        </form>
+    </div>
+    
+    <!-- Выполненные обработки -->
+    <div class="card">
+        <h3><i class="fas fa-check-circle" style="color: #22c55e;"></i> Выполненные обработки</h3>
+        <div class="table-wrapper" style="max-height: 400px; overflow-y: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Дата</th>
+                        <th>Животное</th>
+                        <th>Вакцина</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for h in completed[:10] %}
+                    <tr>
+                        <td>{{ h.date_administered.strftime('%d.%m.%Y') if h.date_administered else '-' }}</td>
+                        <td>{{ h.animal.identifier }}</td>
+                        <td>{{ h.vaccine_name }}</td>
+                        <td>
+                            <div style="display: flex; gap: 5px;">
+                                <a href="{{ url_for('edit_vaccination', id=h.id) }}" class="btn btn-sm" title="Редактировать">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{{ url_for('delete_vaccination', id=h.id) }}" class="btn btn-sm btn-danger confirm-delete" title="Удалить">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align: center;">Нет выполненных обработок</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- МОДАЛЬНОЕ ОКНО ДЛЯ ВЫПОЛНЕНИЯ ПРИВИВКИ -->
+<div id="completeModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 550px;">
+        <div class="modal-header" style="background: linear-gradient(135deg, #22c55e, #16a34a); color: white; border-radius: 16px 16px 0 0;">
+            <h3 style="color: white;"><i class="fas fa-check-circle"></i> Отметить выполнение прививки</h3>
+            <span class="close" onclick="closeModal()" style="color: white;">&times;</span>
+        </div>
+        <div class="modal-body">
+            <!-- Информация о животном -->
+            <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="background: #22c55e; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-paw" style="color: white; font-size: 24px;"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.85rem; color: #166534; font-weight: 500;">ЖИВОТНОЕ</div>
+                        <div style="font-size: 1.2rem; font-weight: 700; color: #14532d;" id="modalAnimal"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Информация о прививке -->
+            <div style="background: #f8fafc; padding: 15px; border-radius: 12px; margin-bottom: 20px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <div style="font-size: 0.8rem; color: #6b7280; margin-bottom: 3px;">
+                            <i class="fas fa-syringe"></i> НАЗВАНИЕ
+                        </div>
+                        <div style="font-weight: 600; font-size: 1.1rem;" id="modalVaccine"></div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.8rem; color: #6b7280; margin-bottom: 3px;">
+                            <i class="fas fa-calendar"></i> ПЛАНОВАЯ ДАТА
+                        </div>
+                        <div style="font-weight: 600;" id="modalDueDate"></div>
+                    </div>
+                </div>
+                
+                <!-- Предупреждение о просрочке -->
+                <div id="overdueWarning" style="display: none; margin-top: 15px; background: #fef2f2; padding: 10px; border-radius: 8px; border-left: 4px solid #ef4444;">
+                    <i class="fas fa-exclamation-triangle" style="color: #ef4444;"></i>
+                    <span style="color: #991b1b;" id="overdueText"></span>
+                </div>
+            </div>
+            
+            <form id="completeForm" method="POST" style="margin-top: 20px;">
+                <input type="hidden" name="action" id="modalAction" value="complete">
+                
+                <p style="font-weight: 500; margin-bottom: 15px; color: var(--text-dark);">
+                    <i class="fas fa-question-circle"></i> Выберите действие:
+                </p>
+                
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <!-- Вариант 1: Просто выполнить -->
+                    <label class="radio-card" style="display: flex; align-items: flex-start; gap: 15px; padding: 15px; border: 2px solid #e2e8f0; border-radius: 12px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#22c55e'" onmouseout="this.style.borderColor='#e2e8f0'">
+                        <input type="radio" name="action_radio" value="complete" checked onchange="toggleNextDate(false)" style="margin-top: 3px;">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                <i class="fas fa-check-circle" style="color: #22c55e; font-size: 1.2rem;"></i>
+                                <strong>Просто отметить как выполненную</strong>
+                            </div>
+                            <small style="color: #6b7280;">Запись переместится в историю выполненных. Повторной записи не будет.</small>
+                        </div>
+                    </label>
+                    
+                    <!-- Вариант 2: Выполнить и повторить -->
+                    <label class="radio-card" style="display: flex; align-items: flex-start; gap: 15px; padding: 15px; border: 2px solid #e2e8f0; border-radius: 12px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='#e2e8f0'">
+                        <input type="radio" name="action_radio" value="complete_and_repeat" onchange="toggleNextDate(true)" style="margin-top: 3px;">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                <i class="fas fa-repeat" style="color: #3b82f6; font-size: 1.2rem;"></i>
+                                <strong>Выполнена и запланировать повтор</strong>
+                            </div>
+                            <small style="color: #6b7280;">Текущая отметится выполненной, и создастся новая запись на следующий срок.</small>
+                        </div>
+                    </label>
+                    
+                    <!-- Блок выбора даты для повтора -->
+                    <div id="nextDateBlock" style="display: none; margin-left: 35px; padding: 15px; background: #eff6ff; border-radius: 10px; border-left: 4px solid #3b82f6;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">
+                            <i class="fas fa-calendar-plus"></i> Дата следующей обработки:
+                        </label>
+                        <input type="date" name="next_date" id="nextDateInput" class="form-control" min="{{ today.strftime('%Y-%m-%d') }}" style="background: white;">
+                        <div style="margin-top: 8px;">
+                            <button type="button" class="btn btn-sm" onclick="setDatePreset(30)" style="margin-right: 5px;">
+                                +30 дней
+                            </button>
+                            <button type="button" class="btn btn-sm" onclick="setDatePreset(90)">
+                                +90 дней
+                            </button>
+                            <button type="button" class="btn btn-sm" onclick="setDatePreset(180)">
+                                +6 мес.
+                            </button>
+                            <button type="button" class="btn btn-sm" onclick="setDatePreset(365)">
+                                +1 год
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 25px;">
+                    <button type="submit" class="btn btn-success" style="flex: 1;">
+                        <i class="fas fa-check"></i> Подтвердить
+                    </button>
+                    <button type="button" class="btn" onclick="closeModal()" style="flex: 1;">
+                        <i class="fas fa-times"></i> Отмена
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.radio-card:hover {
+    border-color: #22c55e !important;
+    background: #f8fafc;
+}
+.radio-card input[type="radio"] {
+    width: 20px;
+    height: 20px;
+    accent-color: #22c55e;
+}
+</style>
+
+<script>
+let currentDueDate = '';
+let currentVacId = null;
+
+function toggleNextDate(show) {
+    const block = document.getElementById('nextDateBlock');
+    const actionInput = document.getElementById('modalAction');
+    const radioCards = document.querySelectorAll('.radio-card');
+    
+    if (show) {
+        block.style.display = 'block';
+        actionInput.value = 'complete_and_repeat';
+        // Меняем цвет рамки выбранной карточки
+        radioCards[0].style.borderColor = '#e2e8f0';
+        radioCards[1].style.borderColor = '#3b82f6';
+        
+        // Устанавливаем дату по умолчанию
+        if (currentDueDate) {
+            const parts = currentDueDate.split('.');
+            if (parts.length === 3) {
+                const date = new Date(parts[2], parts[1] - 1, parts[0]);
+                date.setDate(date.getDate() + 30);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                document.getElementById('nextDateInput').value = `${year}-${month}-${day}`;
+            }
+        } else {
+            const date = new Date();
+            date.setDate(date.getDate() + 30);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            document.getElementById('nextDateInput').value = `${year}-${month}-${day}`;
+        }
+    } else {
+        block.style.display = 'none';
+        actionInput.value = 'complete';
+        radioCards[0].style.borderColor = '#22c55e';
+        radioCards[1].style.borderColor = '#e2e8f0';
+    }
+}
+
+function setDatePreset(days) {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    document.getElementById('nextDateInput').value = `${year}-${month}-${day}`;
+}
+
+function showCompleteModal(id, vaccineName, animalName, dueDate) {
+    currentDueDate = dueDate;
+    currentVacId = id;
+    
+    document.getElementById('modalAnimal').textContent = animalName;
+    document.getElementById('modalVaccine').textContent = vaccineName;
+    document.getElementById('modalDueDate').textContent = dueDate || 'не указана';
+    document.getElementById('completeForm').action = '/vet/' + id + '/complete';
+    
+    // Проверка на просрочку
+    if (dueDate) {
+        const parts = dueDate.split('.');
+        if (parts.length === 3) {
+            const due = new Date(parts[2], parts[1] - 1, parts[0]);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            if (due < today) {
+                const diffDays = Math.floor((today - due) / (1000 * 60 * 60 * 24));
+                document.getElementById('overdueWarning').style.display = 'block';
+                document.getElementById('overdueText').textContent = ` Внимание! Прививка просрочена на ${diffDays} дней.`;
+            } else {
+                document.getElementById('overdueWarning').style.display = 'none';
+            }
+        }
+    } else {
+        document.getElementById('overdueWarning').style.display = 'none';
+    }
+    
+    // Сбрасываем на первый вариант
+    document.querySelector('input[value="complete"]').checked = true;
+    toggleNextDate(false);
+    
+    document.getElementById('completeModal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('completeModal').style.display = 'none';
+}
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeModal();
+    }
+});
+
+window.onclick = function(event) {
+    const modal = document.getElementById('completeModal');
+    if (event.target === modal) {
+        closeModal();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const buttons = document.querySelectorAll('.complete-btn');
+    
+    buttons.forEach(function(button) {
+        button.addEventListener('click', function() {
+            const row = this.closest('tr');
+            const vacId = row.getAttribute('data-vac-id');
+            const vacName = row.getAttribute('data-vac-name');
+            const animalName = row.getAttribute('data-animal-name');
+            const dueDate = row.getAttribute('data-due-date') || '';
+            
+            showCompleteModal(vacId, vacName, animalName, dueDate);
+        });
+    });
+});
+</script>
+{% endblock %}

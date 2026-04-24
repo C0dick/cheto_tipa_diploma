@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Моя Ферма - {% block title %}Главная{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    {% if current_user.is_authenticated %}
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fas fa-tractor"></i>
+            <span>{{ current_user.farm_name or 'Моя Ферма' }}</span>
+        </div>
+        <ul class="nav-links">
+                <li><a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}"><i class="fas fa-chart-pie"></i> Дашборд</a></li>
+                <li><a href="{{ url_for('animals') }}" class="{% if request.endpoint == 'animals' %}active{% endif %}"><i class="fas fa-cow"></i> Животные</a></li>
+                <li><a href="{{ url_for('feed') }}" class="{% if request.endpoint == 'feed' %}active{% endif %}"><i class="fas fa-apple-alt"></i> Корма</a></li>
+                <li><a href="{{ url_for('vet_schedule') }}" class="{% if request.endpoint == 'vet_schedule' %}active{% endif %}"><i class="fas fa-syringe"></i> Ветобработки</a></li>
+                    {% if current_user.is_admin %}
+                <li><a href="{{ url_for('admin_panel') }}" class="{% if request.endpoint == 'admin_panel' %}active{% endif %}"><i class="fas fa-crown"></i> Админ</a></li>
+                    {% endif %}
+        </ul>
+        <div class="user-menu">
+    <!-- Кнопка переключения темы -->
+            <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Переключить тему">
+                <i class="fas fa-moon" id="themeIcon"></i>
+            </button>
+    <a href="{{ url_for('profile') }}" class="profile-link" title="Профиль">
+        <i class="fas fa-user-circle"></i>
+        <span>{{ current_user.username }}</span>
+    </a>
+    <a href="{{ url_for('auth.logout') }}" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Выйти</a>
+</div>
+    </nav>
+    {% endif %}
+
+    <main class="container">
+        <!-- Уведомления с авто-исчезновением -->
+        <div id="alertContainer" style="position: fixed; top: 80px; right: 20px; z-index: 9999; max-width: 350px;">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible" style="margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                {% if category == 'success' %}
+                                    <i class="fas fa-check-circle" style="font-size: 20px;"></i>
+                                {% elif category == 'danger' %}
+                                    <i class="fas fa-exclamation-circle" style="font-size: 20px;"></i>
+                                {% elif category == 'warning' %}
+                                    <i class="fas fa-exclamation-triangle" style="font-size: 20px;"></i>
+                                {% else %}
+                                    <i class="fas fa-info-circle" style="font-size: 20px;"></i>
+                                {% endif %}
+                                <span>{{ message }}</span>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <p>© 2026 Моя Ферма. Умный учет.</p>
+    </footer>
+    
+    <script>
+        // Переключение темы
+        function toggleTheme() {
+            const html = document.documentElement;
+            const themeIcon = document.getElementById('themeIcon');
+            const currentTheme = html.getAttribute('data-theme');
+            
+            if (currentTheme === 'light') {
+                html.setAttribute('data-theme', 'dark');
+                themeIcon.className = 'fas fa-sun';
+                localStorage.setItem('theme', 'dark');
+            } else {
+                html.setAttribute('data-theme', 'light');
+                themeIcon.className = 'fas fa-moon';
+                localStorage.setItem('theme', 'light');
+            }
+        }
+        
+        // Загрузка сохранённой темы
+        function loadTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            const html = document.documentElement;
+            const themeIcon = document.getElementById('themeIcon');
+            
+            html.setAttribute('data-theme', savedTheme);
+            if (savedTheme === 'dark') {
+                themeIcon.className = 'fas fa-sun';
+            } else {
+                themeIcon.className = 'fas fa-moon';
+            }
+        }
+        
+        // Подтверждение удаления
+        document.querySelectorAll('.confirm-delete').forEach(link => {
+            link.addEventListener('click', (e) => {
+                if (!confirm('Вы уверены, что хотите удалить?')) {
+                    e.preventDefault();
+                }
+            });
+        });
+        
+        // Автоматическое скрытие уведомлений через 5 секунд
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTheme();
+            
+            const alerts = document.querySelectorAll('.alert');
+            
+            alerts.forEach(function(alert) {
+                alert.style.animation = 'slideIn 0.3s ease';
+                
+                setTimeout(function() {
+                    alert.style.animation = 'slideOut 0.3s ease';
+                    setTimeout(function() {
+                        if (alert.parentNode) {
+                            alert.remove();
+                        }
+                    }, 300);
+                }, 5000);
+                
+                const closeBtn = document.createElement('span');
+                closeBtn.innerHTML = '&times;';
+                closeBtn.style.cssText = 'margin-left: auto; cursor: pointer; font-size: 20px; opacity: 0.7;';
+                closeBtn.onclick = function() {
+                    alert.style.animation = 'slideOut 0.3s ease';
+                    setTimeout(() => alert.remove(), 300);
+                };
+                alert.style.display = 'flex';
+                alert.style.alignItems = 'center';
+                alert.appendChild(closeBtn);
+            });
+        });
+    </script>
+</body>
+</html>

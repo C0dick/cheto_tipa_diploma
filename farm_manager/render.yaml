@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: farm-manager
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        value: postgresql://neondb_owner:npg_F42twCuXDVZa@ep-damp-dawn-a4v6yi5s-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require
