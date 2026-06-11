@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Добавить животное{% endblock %}
+{% block content %}
+
+<div class="card" style="max-width: 700px; margin: 0 auto;">
+    <div class="card-header">
+        <h2><i class="fas fa-plus-circle" style="color: #22c55e;"></i> Новое животное</h2>
+    </div>
+    
+    <form method="POST" id="addAnimalForm" onsubmit="return validateForm()">
+        <div class="grid-2">
+            <div class="form-group">
+                <label><i class="fas fa-paw"></i> Вид *</label>
+                <select name="species" id="speciesSelect" required onchange="updateStatuses(); checkIdentifierUnique()">
+                    {% for s in species_list %}
+                    <option value="{{ s }}">{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label><i class="fas fa-tag"></i> Кличка / № бирки *</label>
+                <input type="text" name="identifier" id="identifier" placeholder="Например: Зорька" required oninput="checkIdentifierUnique()">
+                <small id="identifierHint" style="color: var(--text-muted);">Уникальное имя для каждого вида</small>
+            </div>
+            
+            <div class="form-group">
+                <label><i class="fas fa-dna"></i> Порода</label>
+                <input type="text" name="breed" placeholder="Например: Голштинская">
+            </div>
+            
+            <div class="form-group">
+                <label><i class="fas fa-venus-mars"></i> Пол</label>
+                <select name="gender">
+                    <option value="">Не указан</option>
+                    <option value="Самка">♀️ Самка</option>
+                    <option value="Самец">♂️ Самец</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label><i class="fas fa-calendar"></i> Дата рождения</label>
+                <input type="date" name="birth_date" max="{{ today.strftime('%Y-%m-%d') }}">
+            </div>
+            
+            <div class="form-group">
+                <label><i class="fas fa-weight-scale"></i> Вес (кг)</label>
+                <input type="number" step="0.1" name="weight" placeholder="Текущий вес">
+            </div>
+            
+            <div class="form-group">
+                <label><i class="fas fa-circle"></i> Статус</label>
+                <select name="status" id="statusSelect">
+                    <option value="Активно">Активно</option>
+                    <option value="Дойная">🥛 Дойная (для коров/коз)</option>
+                    <option value="Сухостой">🌙 Сухостой (для коров/коз)</option>
+                    <option value="На откорме">⚖️ На откорме</option>
+                    <option value="На лечении">🏥 На лечении</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label><i class="fas fa-pen"></i> Заметки</label>
+            <textarea name="notes" rows="3" placeholder="Особые приметы, история..."></textarea>
+        </div>
+        
+        <div style="display: flex; gap: 12px; margin-top: 25px;">
+            <button type="submit" class="btn btn-primary" style="flex: 1;">
+                <i class="fas fa-save"></i> Сохранить
+            </button>
+            <a href="{{ url_for('animals') }}" class="btn" style="flex: 1;">
+                <i class="fas fa-times"></i> Отмена
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- Скрытый элемент для хранения данных -->
+<div id="animalsData" style="display: none;">
+    {% for a in animals %}
+    <span data-species="{{ a.species|lower }}" data-name="{{ a.identifier|lower }}"></span>
+    {% endfor %}
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    // Загружаем данные о существующих животных из скрытого блока
+    var existingAnimals = [];
+    var dataSpans = document.querySelectorAll('#animalsData span');
+    dataSpans.forEach(function(span) {
+        existingAnimals.push({
+            species: span.getAttribute('data-species'),
+            name: span.getAttribute('data-name')
+        });
+    });
+
+    function checkIdentifierUnique() {
+        var speciesSelect = document.getElementById('speciesSelect');
+        var input = document.getElementById('identifier');
+        var hint = document.getElementById('identifierHint');
+        
+        var species = speciesSelect.value.toLowerCase();
+        var name = input.value.trim().toLowerCase();
+        
+        if (name === '') {
+            hint.innerHTML = '<span style="color: #6b7280;">Уникальное имя для каждого вида</span>';
+            input.style.borderColor = '#e2e8f0';
+            return true;
+        }
+        
+        if (name.length < 2) {
+            hint.innerHTML = '<span style="color: #ef4444;"><i class="fas fa-times-circle"></i> Минимум 2 символа</span>';
+            input.style.borderColor = '#ef4444';
+            return false;
+        }
+        
+        var exists = existingAnimals.some(function(a) {
+            return a.species === species && a.name === name;
+        });
+        
+        if (exists) {
+            hint.innerHTML = '<span style="color: #ef4444;"><i class="fas fa-times-circle"></i> У вас уже есть ' + speciesSelect.value + ' с таким именем!</span>';
+            input.style.borderColor = '#ef4444';
+            return false;
+        }
+        
+        hint.innerHTML = '<span style="color: #22c55e;"><i class="fas fa-check-circle"></i> Имя свободно для этого вида</span>';
+        input.style.borderColor = '#22c55e';
+        return true;
+    }
+
+    function validateForm() {
+        var speciesSelect = document.getElementById('speciesSelect');
+        var identifier = document.getElementById('identifier').value.trim();
+        
+        if (identifier.length < 2) {
+            alert('Кличка/номер должен содержать минимум 2 символа');
+            return false;
+        }
+        
+        var species = speciesSelect.value.toLowerCase();
+        var name = identifier.toLowerCase();
+        var exists = existingAnimals.some(function(a) {
+            return a.species === species && a.name === name;
+        });
+        
+        if (exists) {
+            alert('У вас уже есть ' + speciesSelect.value + ' с таким именем! Выберите другое имя.');
+            return false;
+        }
+        
+        return true;
+    }
+
+    function updateStatuses() {
+        var species = document.getElementById('speciesSelect').value;
+        var statusSelect = document.getElementById('statusSelect');
+        
+        var options = [
+            {value: 'Активно', text: '✅ Активно'},
+            {value: 'На откорме', text: '⚖️ На откорме'},
+            {value: 'На лечении', text: '🏥 На лечении'}
+        ];
+        
+        if (species === 'Корова' || species === 'Коза' || species === 'Овца') {
+            options.unshift(
+                {value: 'Дойная', text: '🥛 Дойная'},
+                {value: 'Сухостой', text: '🌙 Сухостой'}
+            );
+        }
+        
+        if (species === 'Пчелосемья') {
+            options = [
+                {value: 'Активно', text: '🐝 Активная'},
+                {value: 'Роение', text: '🔄 Роение'},
+                {value: 'Зимовка', text: '❄️ Зимовка'}
+            ];
+        }
+        
+        if (species === 'Курица' || species === 'Утка' || species === 'Гусь') {
+            options.unshift({value: 'Несушка', text: '🥚 Несушка'});
+        }
+        
+        statusSelect.innerHTML = '';
+        options.forEach(function(opt) {
+            var option = document.createElement('option');
+            option.value = opt.value;
+            option.textContent = opt.text;
+            statusSelect.appendChild(option);
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        updateStatuses();
+    });
+
+})();
+</script>
+
+{% endblock %}
