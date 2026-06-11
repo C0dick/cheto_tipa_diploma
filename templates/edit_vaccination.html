@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Редактировать обработку{% endblock %}
+{% block content %}
+
+<div class="card" style="max-width: 700px; margin: 0 auto;">
+    <div class="card-header">
+        <h2><i class="fas fa-edit" style="color: #3b82f6;"></i> Редактирование ветеринарной записи</h2>
+    </div>
+    
+    <!-- Информация о животном -->
+    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); padding: 15px; border-radius: 12px; margin-bottom: 25px;">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div style="background: #22c55e; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-paw" style="color: white; font-size: 24px;"></i>
+            </div>
+            <div>
+                <div style="font-size: 0.9rem; color: #166534; font-weight: 500;">ЖИВОТНОЕ</div>
+                <div style="font-size: 1.3rem; font-weight: 700; color: #14532d;">{{ animal.identifier }}</div>
+                <div style="color: #166534;">{{ animal.species }} • {{ animal.breed or 'Порода не указана' }}</div>
+            </div>
+            <div style="margin-left: auto;">
+                <span class="status-badge status-{% if animal.status == 'Дойная' %}milking{% elif animal.status == 'Сухостой' %}dry{% elif animal.status == 'На откорме' %}fattening{% else %}active{% endif %}">
+                    <i class="fas {% if animal.status == 'Дойная' %}fa-tint{% elif animal.status == 'Сухостой' %}fa-moon{% elif animal.status == 'На откорме' %}fa-weight-scale{% else %}fa-check{% endif %}"></i>
+                    {{ animal.status }}
+                </span>
+            </div>
+        </div>
+    </div>
+    
+    <form method="POST">
+        <!-- Название вакцины -->
+        <div class="form-group">
+            <label><i class="fas fa-syringe" style="color: #3b82f6;"></i> Название вакцины/обработки *</label>
+            <input type="text" name="vaccine_name" value="{{ vac.vaccine_name }}" required class="form-control" placeholder="Например: Сибирская язва, Глистогонка...">
+        </div>
+        
+        <!-- Даты -->
+        <div class="grid-2">
+            <div class="form-group">
+                <label><i class="fas fa-calendar-check" style="color: #22c55e;"></i> Дата выполнения</label>
+                <input type="date" name="date_administered" value="{{ vac.date_administered.strftime('%Y-%m-%d') if vac.date_administered else '' }}" class="form-control">
+                <small style="color: #6b7280; display: block; margin-top: 5px;">
+                    <i class="fas fa-info-circle"></i> Оставьте пустым, если ещё не выполнена
+                </small>
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-calendar-alt" style="color: #f59e0b;"></i> Плановая дата</label>
+                <input type="date" name="next_due_date" value="{{ vac.next_due_date.strftime('%Y-%m-%d') if vac.next_due_date else '' }}" class="form-control">
+                <small style="color: #6b7280; display: block; margin-top: 5px;">
+                    <i class="fas fa-info-circle"></i> Когда нужно сделать (если запланировано)
+                </small>
+            </div>
+        </div>
+        
+        <!-- Статус -->
+        <div class="form-group">
+            <label><i class="fas fa-tag" style="color: #8b5cf6;"></i> Статус</label>
+            <select name="status" class="form-control" style="background-color: #f9fafb;">
+                <option value="Запланировано" {% if vac.status == 'Запланировано' %}selected{% endif %}>
+                    📋 Запланировано — ожидает выполнения
+                </option>
+                <option value="Выполнено" {% if vac.status == 'Выполнено' %}selected{% endif %}>
+                    ✅ Выполнено — уже сделано
+                </option>
+            </select>
+        </div>
+        
+        <!-- Заметки -->
+        <div class="form-group">
+            <label><i class="fas fa-pen" style="color: #6b7280;"></i> Заметки</label>
+            <textarea name="notes" rows="4" class="form-control" placeholder="Дополнительная информация, наблюдения, рекомендации...">{{ vac.notes or '' }}</textarea>
+        </div>
+        
+        <!-- Информация о создании -->
+        <div style="background: #f3f4f6; padding: 12px 16px; border-radius: 8px; margin: 20px 0; display: flex; gap: 20px; font-size: 0.85rem; color: #6b7280;">
+            <div>
+                <i class="fas fa-calendar-plus"></i> 
+                {% if vac.date_administered %}
+                    Выполнена: {{ vac.date_administered.strftime('%d.%m.%Y') }}
+                {% else %}
+                    Создана: {{ vac.next_due_date.strftime('%d.%m.%Y') if vac.next_due_date else 'дата не указана' }}
+                {% endif %}
+            </div>
+            <div>
+                <i class="fas fa-hourglass-half"></i> 
+                Текущий статус: 
+                {% if vac.status == 'Выполнено' %}
+                    <span style="color: #166534; font-weight: 600;">✅ Выполнено</span>
+                {% else %}
+                    <span style="color: #1e40af; font-weight: 600;">📋 Запланировано</span>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Кнопки действий -->
+        <div style="display: flex; gap: 12px; margin-top: 25px;">
+            <button type="submit" class="btn btn-primary" style="flex: 1;">
+                <i class="fas fa-save"></i> Сохранить изменения
+            </button>
+            <a href="{{ url_for('vet_schedule') }}" class="btn" style="flex: 1;">
+                <i class="fas fa-times"></i> Отмена
+            </a>
+        </div>
+    </form>
+    
+    <!-- Разделитель -->
+    <hr style="margin: 30px 0; border: none; border-top: 2px solid #e5e7eb;">
+    
+    <!-- Внимание -->
+    <div style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #ef4444;">
+        <h4 style="color: #991b1b; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-exclamation-triangle"></i> Внимание
+        </h4>
+        <p style="color: #7f1d1d; margin-bottom: 15px;">Это действие нельзя отменить. Запись будет удалена безвозвратно.</p>
+        <div style="display: flex; gap: 10px;">
+            <a href="{{ url_for('delete_vaccination', id=vac.id) }}" class="btn btn-danger confirm-delete" style="flex: 1;">
+                <i class="fas fa-trash"></i> Удалить запись
+            </a>
+            {% if vac.status != 'Выполнено' %}
+            <button type="button" class="btn btn-success quick-complete-btn" style="flex: 1;" data-vac-id="{{ vac.id }}" data-vac-name="{{ vac.vaccine_name }}">
+                <i class="fas fa-check-circle"></i> Отметить как выполненную
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для быстрого выполнения -->
+<div id="quickCompleteModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-check-circle" style="color: #22c55e;"></i> Отметить как выполненную</h3>
+            <span class="close" onclick="closeQuickModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p>Отметить прививку <strong id="quickCompleteVaccineName"></strong> как выполненную?</p>
+            <p>Дата выполнения будет установлена на сегодня ({{ today.strftime('%d.%m.%Y') }}).</p>
+            
+            <form id="quickCompleteForm" method="POST">
+                <input type="hidden" name="action" value="complete">
+                
+                <div style="display: flex; gap: 10px; margin-top: 25px;">
+                    <button type="submit" class="btn btn-success" style="flex: 1;">
+                        <i class="fas fa-check"></i> Да, выполнено
+                    </button>
+                    <button type="button" class="btn" onclick="closeQuickModal()" style="flex: 1;">
+                        <i class="fas fa-times"></i> Отмена
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+    
+    // Функция для открытия модального окна
+    window.markAsCompleted = function(vacId, vacName) {
+        document.getElementById('quickCompleteVaccineName').textContent = vacName;
+        document.getElementById('quickCompleteForm').action = '/vet/' + vacId + '/complete';
+        document.getElementById('quickCompleteModal').style.display = 'flex';
+    };
+    
+    window.closeQuickModal = function() {
+        document.getElementById('quickCompleteModal').style.display = 'none';
+    };
+    
+    // Навешиваем обработчики при загрузке
+    document.addEventListener('DOMContentLoaded', function() {
+        const quickCompleteBtn = document.querySelector('.quick-complete-btn');
+        if (quickCompleteBtn) {
+            quickCompleteBtn.addEventListener('click', function() {
+                const vacId = this.getAttribute('data-vac-id');
+                const vacName = this.getAttribute('data-vac-name');
+                window.markAsCompleted(vacId, vacName);
+            });
+        }
+    });
+    
+    // Закрытие по Escape
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            window.closeQuickModal();
+        }
+    });
+    
+    // Закрытие по клику вне окна
+    window.onclick = function(event) {
+        const modal = document.getElementById('quickCompleteModal');
+        if (event.target === modal) {
+            window.closeQuickModal();
+        }
+    };
+})();
+</script>
+
+{% endblock %}
