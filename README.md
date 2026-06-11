@@ -1,1 +1,0 @@
-# cheto_tipa_diploma
